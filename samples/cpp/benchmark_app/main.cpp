@@ -27,6 +27,8 @@
 #include "remote_tensors_filling.hpp"
 #include "statistics_report.hpp"
 #include "utils.hpp"
+#include <ngraph/pass/manager.hpp>
+#include <ngraph/pass/serialize.hpp>
 // clang-format on
 
 namespace {
@@ -677,7 +679,18 @@ int main(int argc, char* argv[]) {
             slog::info << "Loading model files" << slog::endl;
 
             auto startTime = Time::now();
-            auto model = core.read_model(FLAGS_m);
+            {
+                auto model = core.read_model(FLAGS_m);
+                ngraph::pass::Manager manager;
+                manager.register_pass<ngraph::pass::Serialize>("checkpoint1.xml", "checkpoint1.bin");
+                manager.run_passes(model);
+            }
+            auto model = core.read_model("checkpoint1.xml");
+            {
+                ngraph::pass::Manager manager;
+                manager.register_pass<ngraph::pass::Serialize>("checkpoint2.xml", "checkpoint2.bin");
+                manager.run_passes(model);
+            }
             auto duration_ms = get_duration_ms_till_now(startTime);
             slog::info << "Read model took " << double_to_string(duration_ms) << " ms" << slog::endl;
             slog::info << "Original model I/O parameters:" << slog::endl;
