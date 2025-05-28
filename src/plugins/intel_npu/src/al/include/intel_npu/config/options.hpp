@@ -411,7 +411,7 @@ struct BATCH_MODE final : OptionBase<BATCH_MODE, ov::intel_npu::BatchMode> {
     }
 
     static OptionMode mode() {
-        return OptionMode::CompileTime;
+        return OptionMode::Both;
     }
 
     static ov::intel_npu::BatchMode parse(std::string_view val) {
@@ -862,38 +862,6 @@ struct COMPILER_TYPE final : OptionBase<COMPILER_TYPE, ov::intel_npu::CompilerTy
 };
 
 //
-// COMPILATION_MODE
-//
-
-struct COMPILATION_MODE final : OptionBase<COMPILATION_MODE, std::string> {
-    static std::string_view key() {
-        return ov::intel_npu::compilation_mode.name();
-    }
-
-#ifdef NPU_PLUGIN_DEVELOPER_BUILD
-    static std::string_view envVar() {
-        return "IE_NPU_COMPILATION_MODE";
-    }
-#endif
-
-    static std::string defaultValue() {
-        return "";
-    }
-
-    static OptionMode mode() {
-        return OptionMode::CompileTime;
-    }
-
-    static bool isPublic() {
-        return false;
-    }
-
-    static ov::PropertyMutability mutability() {
-        return ov::PropertyMutability::RW;
-    }
-};
-
-//
 // EXECUTION_MODE_HINT
 //
 
@@ -920,38 +888,6 @@ struct EXECUTION_MODE_HINT final : OptionBase<EXECUTION_MODE_HINT, ov::hint::Exe
 
     static bool isPublic() {
         return true;
-    }
-
-    static ov::PropertyMutability mutability() {
-        return ov::PropertyMutability::RW;
-    }
-};
-
-//
-// DYNAMIC_SHAPE_TO_STATIC
-//
-
-struct DYNAMIC_SHAPE_TO_STATIC final : OptionBase<DYNAMIC_SHAPE_TO_STATIC, bool> {
-    static std::string_view key() {
-        return ov::intel_npu::dynamic_shape_to_static.name();
-    }
-
-#ifdef NPU_PLUGIN_DEVELOPER_BUILD
-    static std::string_view envVar() {
-        return "IE_NPU_DYNAMIC_SHAPE_TO_STATIC";
-    }
-#endif
-
-    static bool defaultValue() {
-        return false;
-    }
-
-    static OptionMode mode() {
-        return OptionMode::CompileTime;
-    }
-
-    static bool isPublic() {
-        return false;
     }
 
     static ov::PropertyMutability mutability() {
@@ -1083,7 +1019,7 @@ struct STEPPING final : OptionBase<STEPPING, int64_t> {
     }
 
     static OptionMode mode() {
-        return OptionMode::CompileTime;
+        return OptionMode::Both;
     }
 
     static bool isPublic() {
@@ -1122,68 +1058,6 @@ struct MAX_TILES final : OptionBase<MAX_TILES, int64_t> {
 
     static bool isPublic() {
         return true;
-    }
-
-    static ov::PropertyMutability mutability() {
-        return ov::PropertyMutability::RW;
-    }
-};
-
-//
-// DMA_ENGINES
-//
-
-struct DMA_ENGINES final : OptionBase<DMA_ENGINES, int64_t> {
-    static std::string_view key() {
-        return ov::intel_npu::dma_engines.name();
-    }
-
-    static std::vector<std::string_view> deprecatedKeys() {
-        return {};
-    }
-
-    static int64_t defaultValue() {
-        return -1;
-    }
-
-    static OptionMode mode() {
-        return OptionMode::CompileTime;
-    }
-
-    static bool isPublic() {
-        return false;
-    }
-
-    static ov::PropertyMutability mutability() {
-        return ov::PropertyMutability::RW;
-    }
-
-#ifdef NPU_PLUGIN_DEVELOPER_BUILD
-    static std::string_view envVar() {
-        return "IE_NPU_DMA_ENGINES";
-    }
-#endif
-};
-
-//
-// BACKEND_COMPILATION_PARAMS
-//
-
-struct BACKEND_COMPILATION_PARAMS final : OptionBase<BACKEND_COMPILATION_PARAMS, std::string> {
-    static std::string_view key() {
-        return ov::intel_npu::backend_compilation_params.name();
-    }
-
-    static std::string defaultValue() {
-        return {};
-    }
-
-    static OptionMode mode() {
-        return OptionMode::CompileTime;
-    }
-
-    static bool isPublic() {
-        return false;
     }
 
     static ov::PropertyMutability mutability() {
@@ -1342,32 +1216,6 @@ struct DISABLE_VERSION_CHECK final : OptionBase<DISABLE_VERSION_CHECK, bool> {
 
     static OptionMode mode() {
         return OptionMode::RunTime;
-    }
-};
-
-//
-// BATCH_COMPILER_MODE_SETTINGS
-//
-
-struct BATCH_COMPILER_MODE_SETTINGS final : OptionBase<BATCH_COMPILER_MODE_SETTINGS, std::string> {
-    static std::string_view key() {
-        return ov::intel_npu::batch_compiler_mode_settings.name();
-    }
-
-    static std::string defaultValue() {
-        return {};
-    }
-
-    static OptionMode mode() {
-        return OptionMode::CompileTime;
-    }
-
-    static uint32_t compilerSupportVersion() {
-        return ONEAPI_MAKE_VERSION(7, 4);
-    }
-
-    static bool isPublic() {
-        return false;
     }
 };
 

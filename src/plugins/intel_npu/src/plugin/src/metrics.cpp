@@ -38,7 +38,7 @@ Metrics::Metrics(const ov::SoPtr<IEngineBackend>& backend) : _backend(backend) {
                             ov::num_streams.name(),
                             ov::hint::num_requests.name(),
                             ov::intel_npu::compilation_mode_params.name(),
-                            ov::intel_npu::dynamic_shape_to_static.name()};
+                            "NPU_DYNAMIC_SHAPE_TO_STATIC"};
 }
 
 std::vector<std::string> Metrics::GetAvailableDevicesNames() const {
