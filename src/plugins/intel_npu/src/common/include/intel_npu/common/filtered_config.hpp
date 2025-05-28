@@ -97,6 +97,13 @@ public:
     std::string getInternal(std::string key) const;
 
     /**
+     * @brief Checks if a given internal configuration exists already in config.
+     * @param key The key of the internal configuration to retrieve.
+     * @return bool reflecting the presence of requested internal config
+     */
+    bool hasInternal(std::string key) const;
+
+    /**
      * @brief Generates a string representation of all internal configurations for compiler use.
      * @return A string containing all internal configurations formatted for compiler use.
      */

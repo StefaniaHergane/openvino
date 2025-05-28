@@ -82,6 +82,11 @@ void FilteredConfig::addOrUpdateInternal(std::string key, std::string value) {
     }
 }
 
+bool FilteredConfig::hasInternal(std::string key) const {
+    auto log = Logger::global().clone("Config");
+    return _internal_compiler_configs.count(key);
+}
+
 std::string FilteredConfig::getInternal(std::string key) const {
     auto log = Logger::global().clone("Config");
     if (_internal_compiler_configs.count(key) == 0) {
