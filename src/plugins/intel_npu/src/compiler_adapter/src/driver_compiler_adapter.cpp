@@ -43,6 +43,9 @@ std::shared_ptr<IGraph> DriverCompilerAdapter::compile(const std::shared_ptr<con
     OV_ITT_TASK_CHAIN(COMPILE_BLOB, itt::domains::NPUPlugin, "DriverCompilerAdapter", "compile");
 
     const ze_graph_compiler_version_info_t& compilerVersion = _compilerProperties.compilerVersion;
+    _logger.error("DRIVER_COMPILER_PROOF: raw Level Zero compilerVersion (pfnDeviceGetGraphProperties): %d.%d",
+                  compilerVersion.major,
+                  compilerVersion.minor);
     const auto maxOpsetVersion = _compilerProperties.maxOVOpsetVersionSupported;
     _logger.info("getSupportedOpsetVersion Max supported version of opset in CiD: %d", maxOpsetVersion);
 
@@ -106,6 +109,9 @@ std::shared_ptr<IGraph> DriverCompilerAdapter::compileWS(std::shared_ptr<ov::Mod
     OV_ITT_TASK_CHAIN(COMPILE_BLOB, itt::domains::NPUPlugin, "DriverCompilerAdapter", "compileWS");
 
     const ze_graph_compiler_version_info_t& compilerVersion = _compilerProperties.compilerVersion;
+    _logger.error("DRIVER_COMPILER_PROOF: raw Level Zero compilerVersion (pfnDeviceGetGraphProperties): %d.%d",
+                  compilerVersion.major,
+                  compilerVersion.minor);
     if ((compilerVersion.major < 6) || (compilerVersion.major == 6 && compilerVersion.minor < 3)) {
         OPENVINO_THROW("Minimum compiler version required for weights separation: 6.3. Found: ",
                        compilerVersion.major,

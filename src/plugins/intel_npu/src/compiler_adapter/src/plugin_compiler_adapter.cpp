@@ -65,6 +65,13 @@ std::shared_ptr<IGraph> PluginCompilerAdapter::compile(const std::shared_ptr<con
                                                        const FilteredConfig& config) const {
     OV_ITT_TASK_CHAIN(COMPILE_BLOB, itt::domains::NPUPlugin, "PluginCompilerAdapter", "compile");
 
+    uint32_t compilerVersion = _compiler->get_version();
+    uint32_t majorVersion = (compilerVersion >> 16) & 0xFFFF;
+    uint32_t minorVersion = compilerVersion & 0xFFFF;
+    _logger.error("PLUGIN_COMPILER_VERSION_METRIC: VCL compiler version: %d.%d (from VCLCompilerImpl)",
+                  majorVersion,
+                  minorVersion);
+
     _logger.debug("compile start");
     auto [tensor, compatibilityDescriptor] = _compiler->compile(model, config);
     _logger.debug("compile end");
@@ -110,6 +117,14 @@ std::shared_ptr<IGraph> PluginCompilerAdapter::compile(const std::shared_ptr<con
 std::shared_ptr<IGraph> PluginCompilerAdapter::compileWS(std::shared_ptr<ov::Model>&& model,
                                                          const FilteredConfig& config) const {
     OV_ITT_TASK_CHAIN(COMPILE_BLOB, itt::domains::NPUPlugin, "PluginCompilerAdapter", "compileWS");
+
+    uint32_t compilerVersion = _compiler->get_version();
+    uint32_t majorVersion = (compilerVersion >> 16) & 0xFFFF;
+    uint32_t minorVersion = compilerVersion & 0xFFFF;
+    _logger.error("PLUGIN_COMPILER_VERSION_METRIC: VCL compiler version: %d.%d (from VCLCompilerImpl)",
+                  majorVersion,
+                  minorVersion);
+
     _logger.debug("compile start");
 
     FilteredConfig localConfig = config;
