@@ -38,6 +38,10 @@ public:
 
     uint32_t get_version() const override;
 
+    bool supports_compilation_targets() const override;
+
+    std::vector<ov::CompilationTarget> get_compilation_targets(const std::string& config) const override;
+
 private:
     std::shared_ptr<ZeroInitStructsHolder> _zeroInitStruct;
     std::shared_ptr<ZeGraphExtWrappers> _zeGraphExt;

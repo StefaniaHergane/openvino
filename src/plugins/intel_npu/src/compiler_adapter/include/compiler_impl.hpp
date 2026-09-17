@@ -19,6 +19,7 @@
 #include "openvino/core/model.hpp"
 #include "openvino/runtime/common.hpp"
 #include "openvino/runtime/profiling_info.hpp"
+#include "openvino/runtime/properties.hpp"
 #include "openvino/runtime/tensor.hpp"
 
 namespace intel_npu {
@@ -112,6 +113,20 @@ public:
      */
     bool is_option_supported(const std::string& option,
                              const std::optional<std::string>& optValue = std::nullopt) const;
+
+    /**
+     * @brief Whether the loaded compiler exposes the offline compilation targets enumeration API.
+     */
+    bool supports_compilation_targets() const;
+
+    /**
+     * @brief Enumerates the offline compilation targets valid for the given filter config.
+     * @param config Serialized `KEY="value"` filter options (e.g. NPU_PLATFORM, NPU_TILES, PERFORMANCE_HINT)
+     * @return The enumerated targets, already canonicalized and deduplicated by the compiler.
+     */
+    std::vector<ov::CompilationTarget> get_compilation_targets(const std::string& config) const;
+
+    std::shared_ptr<void> getLinkedLibrary() const;
 
 private:
     /**

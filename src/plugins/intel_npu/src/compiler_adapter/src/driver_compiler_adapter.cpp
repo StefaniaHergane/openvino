@@ -408,4 +408,14 @@ std::optional<std::string> DriverCompilerAdapter::get_compatibility_descriptor(z
     return _zeGraphExt->getCompatibilityDescriptor(graphHandle);
 }
 
+bool DriverCompilerAdapter::supports_compilation_targets() const {
+    // Offline compilation targets must be enumerable with no device present; the driver compiler
+    // requires a live device, so it never backs this property.
+    return false;
+}
+
+std::vector<ov::CompilationTarget> DriverCompilerAdapter::get_compilation_targets(const std::string&) const {
+    OPENVINO_THROW("Offline compilation targets are not supported by DriverCompilerAdapter");
+}
+
 }  // namespace intel_npu

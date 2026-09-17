@@ -313,4 +313,12 @@ bool PluginCompilerAdapter::is_option_supported(const std::string& optname,
     return supported;
 }
 
+bool PluginCompilerAdapter::supports_compilation_targets() const {
+    return _compiler->supports_compilation_targets();
+}
+
+std::vector<ov::CompilationTarget> PluginCompilerAdapter::get_compilation_targets(const std::string& config) const {
+    return _compiler->get_compilation_targets(config);
+}
+
 }  // namespace intel_npu
