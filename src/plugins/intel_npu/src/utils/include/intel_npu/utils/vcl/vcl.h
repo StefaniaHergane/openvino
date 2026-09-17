@@ -67,6 +67,9 @@ typedef struct __vcl_profiling_handle_t* vcl_profiling_handle_t;
 /// @brief QueryNetwork handle
 typedef struct __vcl_query_handle_t* vcl_query_handle_t;
 
+/// @brief CompilationTargets handle
+typedef struct __vcl_compilation_targets_handle_t* vcl_compilation_targets_handle_t;
+
 /// @brief Error log handle
 typedef struct __vcl_log_handle_t* vcl_log_handle_t;
 
@@ -341,6 +344,45 @@ VCL_APIEXPORT vcl_result_t VCL_APICALL vclGetCompilerSupportedOptions(vcl_compil
 /// @brief Verifies if a given config option (or option-value pair) is supported by the compiler
 VCL_APIEXPORT vcl_result_t VCL_APICALL vclGetCompilerIsOptionSupported(vcl_compiler_handle_t compiler,
                                                                        const char* option, const char* value);
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Describes a single offline compilation target
+/// @details A target names one platform and carries the config bundles to compile for it,
+/// one per SKU of that platform. Each bundle is a serialized config in the same
+/// `KEY="value"` format \b vcl_executable_desc_t::options accepts, so it can be passed
+/// back to the compiler as-is.
+/// @warning All pointers refer to storage owned by the \b vcl_compilation_targets_handle_t
+/// this target was obtained from and are only valid until that handle is destroyed.
+typedef struct __vcl_compilation_target_t {
+    const char* platform;               ///< Standardized platform id, e.g. "4000"
+    uint64_t platformSize;              ///< Length of platform, excluding the null terminator
+    uint32_t deviceID;                  ///< Representative PCI Device ID of the platform
+    const char** configBundle;          ///< The config bundles, one per SKU
+    const uint64_t* configBundleSizes;  ///< Length of each configBundle entry, excluding the null terminator
+    uint64_t configBundleCount;         ///< Number of entries in configBundle and in configBundleSizes
+} vcl_compilation_target_t;
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Enumerates the offline compilation targets valid for the given config and returns the handle.
+/// @details Targets are derived solely from the explicit properties present in \b config
+/// (e.g. NPU_PLATFORM, NPU_TILES, PERFORMANCE_HINT). The init-time device descriptor is not
+/// consulted.
+/// @note The handle must be released with \b vclCompilationTargetsDestroy.
+VCL_APIEXPORT vcl_result_t VCL_APICALL vclCompilationTargetsCreate(vcl_compiler_handle_t compiler, const char* config,
+                                                                   uint64_t configSize,
+                                                                   vcl_compilation_targets_handle_t* targetsHandle);
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Retrieves the targets enumerated by \b vclCompilationTargetsCreate.
+/// @warning The returned array, and everything it points to, is owned by \b targetsHandle
+/// and only stays valid until \b vclCompilationTargetsDestroy is called on it.
+VCL_APIEXPORT vcl_result_t VCL_APICALL vclGetCompilationTargets(vcl_compilation_targets_handle_t targetsHandle,
+                                                                const vcl_compilation_target_t** targets,
+                                                                uint64_t* targetsCount);
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Destroys the compilation targets handle and releases the enumerated targets.
+VCL_APIEXPORT vcl_result_t VCL_APICALL vclCompilationTargetsDestroy(vcl_compilation_targets_handle_t targetsHandle);
 
 #if defined(__cplusplus)
 }  // extern "C"
