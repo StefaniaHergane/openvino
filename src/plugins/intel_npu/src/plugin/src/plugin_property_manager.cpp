@@ -49,6 +49,32 @@ ResolvedRequestContext resolveRequestContext(const ov::AnyMap& arguments,
     return {compilerType, std::move(deviceId), std::move(platform)};
 }
 
+// Serializes the subset of `arguments` relevant to compilation-target enumeration into the
+// `KEY="value"` space-separated form the compiler's target-enumeration API expects.
+std::string buildCompilationTargetsFilter(const ov::AnyMap& arguments) {
+    std::string result;
+    auto append = [&](const std::string& key, const std::string& value) {
+        if (!result.empty()) {
+            result += ' ';
+        }
+        result += key;
+        result += "=\"";
+        result += value;
+        result += '"';
+    };
+
+    if (const auto it = arguments.find(ov::intel_npu::platform.name()); it != arguments.end()) {
+        append(std::string(ov::intel_npu::platform.name()), it->second.as<std::string>());
+    }
+    if (const auto it = arguments.find(ov::intel_npu::tiles.name()); it != arguments.end()) {
+        append(std::string(ov::intel_npu::tiles.name()), it->second.as<std::string>());
+    }
+    if (const auto it = arguments.find(ov::hint::performance_mode.name()); it != arguments.end()) {
+        append(std::string(ov::hint::performance_mode.name()), it->second.as<std::string>());
+    }
+    return result;
+}
+
 bool isCompatibilityCheckSupported(const ov::SoPtr<intel_npu::IEngineBackend>& backend,
                                    intel_npu::CompilerOptionSupportHelper& optionSupportHelper) {
     using namespace intel_npu;
@@ -1001,6 +1027,36 @@ void PluginPropertyManager::registerProperties() {
         },
         [](const ov::Any&) {
             OPENVINO_THROW("READ-ONLY configuration key: ", ov::intel_npu::compiler_version.name());
+        }
+    );
+
+    register_property(ov::offline_compilation_targets.name(), true, ov::PropertyMutability::RO,
+         [this, getCompilerTypeOrDefault](const ov::AnyMap& arguments)  {  // support predicate
+            auto compilerType = getCompilerTypeOrDefault(arguments);
+            if (compilerType.has_value() && compilerType.value() != ov::intel_npu::CompilerType::PLUGIN &&
+                compilerType.value() != ov::intel_npu::CompilerType::PREFER_PLUGIN) {
+                // This property only ever answers via the plugin compiler, which must work with no
+                // device present; a request explicitly pinned to another compiler can never be satisfied.
+                return false;
+            }
+
+            try {
+                CompilerAdapterFactory factory;
+                auto pluginCompilerType = ov::intel_npu::CompilerType::PLUGIN;
+                auto compiler = factory.getCompiler(_backend, pluginCompilerType, "");
+                return compiler != nullptr && compiler->supports_compilation_targets();
+            } catch (...) {
+                return false;
+            }
+        },
+        [this](const ov::AnyMap& arguments) {  // value getter
+            CompilerAdapterFactory factory;
+            auto compilerType = ov::intel_npu::CompilerType::PLUGIN;
+            auto compiler = factory.getCompiler(_backend, compilerType, "");
+            return compiler->get_compilation_targets(buildCompilationTargetsFilter(arguments));
+        },
+        [](const ov::Any&) {
+            OPENVINO_THROW("READ-ONLY configuration key: ", ov::offline_compilation_targets.name());
         }
     );
     // clang-format on
