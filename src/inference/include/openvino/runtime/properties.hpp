@@ -1526,4 +1526,92 @@ inline constexpr Property<std::string, PropertyMutability::RO> runtime_requireme
  * @endcode
  */
 static constexpr Property<CompatibilityCheck, PropertyMutability::RO> compatibility_check{"COMPATIBILITY_CHECK"};
+
+/**
+ * @brief A single target for offline model compilation.
+ * @ingroup ov_runtime_cpp_prop_api
+ *
+ * @details A compilation target: a platform-scoped, externally consumable descriptor of
+ * what a model can be compiled *for*. It carries everything the compiler needs, so
+ * compiling for the target does not require that device to be present.
+ */
+struct CompilationTarget {
+    /// Platform identifier. Equal to ov::device::architecture as reported by a device of
+    /// this platform, and equal to the platform the compiler is invoked with online.
+    std::string platform;
+
+    /// PCI device IDs this target corresponds to. Present so an application can filter the
+    /// returned list against IDs it sourced from the OS. Plural because one platform may
+    /// ship under several device IDs
+    std::vector<uint32_t> device_ids;
+
+    /// Opaque, compiler-owned config bundles. OpenVINO stores, returns and replays these
+    /// but never parses or mutates them. Valid only for the compiler instance that
+    /// produced them.
+    std::vector<std::string> configs;
+};
+
+/** @cond INTERNAL */
+// Serialized as "<platform>;<n_ids>,<id>,...;<n_configs>;<len>:<config>;<len>:<config>;...".
+// Fields are never separated by spaces because this type is also read back as an element of
+// std::vector<CompilationTarget>, whose generic ov::Any parsing tokenizes on whitespace first.
+// Each opaque config is length-prefixed so its content may contain any character, including the
+// ';'/',' separators used above.
+inline std::ostream& operator<<(std::ostream& os, const CompilationTarget& target) {
+    os << target.platform << ';' << target.device_ids.size();
+    for (auto& id : target.device_ids) {
+        os << ',' << id;
+    }
+    os << ';' << target.configs.size();
+    for (auto& config : target.configs) {
+        os << ';' << config.size() << ':' << config;
+    }
+    return os;
+}
+
+inline std::istream& operator>>(std::istream& is, CompilationTarget& target) {
+    char delim = '\0';
+    std::getline(is, target.platform, ';');
+
+    size_t device_ids_size = 0;
+    is >> device_ids_size;
+    target.device_ids.clear();
+    target.device_ids.reserve(device_ids_size);
+    for (size_t i = 0; i < device_ids_size; ++i) {
+        uint32_t id = 0;
+        is >> delim >> id;
+        target.device_ids.push_back(id);
+    }
+
+    size_t configs_size = 0;
+    is >> delim >> configs_size;
+    target.configs.clear();
+    target.configs.reserve(configs_size);
+    for (size_t i = 0; i < configs_size; ++i) {
+        size_t config_length = 0;
+        is >> delim >> config_length >> delim;
+        std::string config(config_length, '\0');
+        is.read(&config[0], config_length);
+        target.configs.push_back(std::move(config));
+    }
+    return is;
+}
+/** @endcond */
+
+/**
+ * @brief Read-only: offline compilation targets supported by this device's compiler.
+ * @ingroup ov_runtime_cpp_prop_api
+ *
+ * @details Query with an optional argument map to filter. Must be supported even when no device
+ * of this type is present in the system.
+ */
+static constexpr Property<std::vector<CompilationTarget>, PropertyMutability::RO> offline_compilation_targets{
+    "OFFLINE_COMPILATION_TARGETS"};
+
+/**
+ * @brief Compile-time: select one offline compilation target.
+ * @ingroup ov_runtime_cpp_prop_api
+ */
+static constexpr Property<CompilationTarget, PropertyMutability::RW> compilation_target{"COMPILATION_TARGET"};
+
 }  // namespace ov
