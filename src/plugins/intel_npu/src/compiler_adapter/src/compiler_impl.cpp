@@ -641,4 +641,45 @@ bool VCLCompilerImpl::is_option_supported(const std::string& option, const std::
     return false;
 }
 
+bool VCLCompilerImpl::supports_compilation_targets() const {
+    return VCLApi::getInstance()->vclCompilationTargetsCreate != nullptr &&
+          VCLApi::getInstance()->vclGetCompilationTargets != nullptr &&
+          VCLApi::getInstance()->vclCompilationTargetsDestroy != nullptr;
+}
+
+std::vector<ov::CompilationTarget> VCLCompilerImpl::get_compilation_targets(const std::string& config) const {
+    vcl_compilation_targets_handle_t targetsHandle = nullptr;
+    THROW_ON_FAIL_FOR_VCL(
+        "vclCompilationTargetsCreate",
+        vclCompilationTargetsCreate(_compilerHandle, config.c_str(), config.size(), &targetsHandle),
+        _logHandle);
+
+    std::vector<ov::CompilationTarget> result;
+    try {
+        const vcl_compilation_target_t* targets = nullptr;
+        uint64_t targetsCount = 0;
+        THROW_ON_FAIL_FOR_VCL("vclGetCompilationTargets",
+                              vclGetCompilationTargets(targetsHandle, &targets, &targetsCount),
+                              _logHandle);
+
+        result.reserve(targetsCount);
+        for (uint64_t i = 0; i < targetsCount; ++i) {
+            const auto& target = targets[i];
+            ov::CompilationTarget ovTarget;
+            ovTarget.platform.assign(target.platform, target.platformSize);
+            ovTarget.device_ids = {target.deviceID};
+            ovTarget.configs.reserve(target.configBundleCount);
+            for (uint64_t b = 0; b < target.configBundleCount; ++b) {
+                ovTarget.configs.emplace_back(target.configBundle[b], target.configBundleSizes[b]);
+            }
+            result.push_back(std::move(ovTarget));
+        }
+    } catch (...) {
+        vclCompilationTargetsDestroy(targetsHandle);
+        throw;
+    }
+    vclCompilationTargetsDestroy(targetsHandle);
+    return result;
+}
+
 }  // namespace intel_npu

@@ -6,6 +6,7 @@
 
 #include "intel_npu/common/filtered_config.hpp"
 #include "intel_npu/common/igraph.hpp"
+#include "openvino/runtime/properties.hpp"
 
 namespace intel_npu {
 
@@ -37,6 +38,17 @@ public:
     virtual std::vector<std::string> get_supported_options() const = 0;
     virtual bool is_option_supported(const std::string& optName,
                                      const std::optional<std::string>& optValue = std::nullopt) const = 0;
+
+    /**
+     * @brief Whether this compiler exposes the offline compilation targets enumeration API.
+     */
+    virtual bool supports_compilation_targets() const = 0;
+
+    /**
+     * @brief Enumerates the offline compilation targets valid for the given filter config.
+     * @param config Serialized `KEY="value"` filter options (e.g. NPU_PLATFORM, NPU_TILES, PERFORMANCE_HINT)
+     */
+    virtual std::vector<ov::CompilationTarget> get_compilation_targets(const std::string& config) const = 0;
 
     virtual ~ICompilerAdapter() = default;
 };

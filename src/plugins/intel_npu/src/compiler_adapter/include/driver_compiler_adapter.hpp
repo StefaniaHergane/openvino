@@ -38,6 +38,10 @@ public:
 
     uint32_t get_version() const override;
 
+    bool supports_compilation_targets() const override;
+
+    std::vector<ov::CompilationTarget> get_compilation_targets(const std::string& config) const override;
+
 private:
     // Fetches the runtime requirements of a compiled graph from the
     // driver via zeDeviceGetRuntimeRequirements. Returns std::nullopt when the driver does not
