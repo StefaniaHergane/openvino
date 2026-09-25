@@ -401,6 +401,15 @@ std::pair<Config, ov::AnyMap> PluginPropertyManager::getMergedConfigAndUnknownPr
         }
     }
 
+    if (mergeMode != ConfigMergeMode::Import && updatedConfig.has<COMPILATION_TARGET>()) {
+        // Offline target-driven mode: the target names the platform to compile for, so the plugin must not
+        // fall back to its own device-derived default - and a caller-supplied platform would silently
+        // compete with it, so that combination is rejected instead of picking a winner.
+        OPENVINO_ASSERT(properties.find(ov::intel_npu::platform.name()) == properties.end(),
+                        "ov::compilation_target cannot be combined with ov::intel_npu::platform in the same call");
+        updatedConfig.update(ov::intel_npu::platform.name(), updatedConfig.get<COMPILATION_TARGET>().platform);
+    }
+
     if (mergeMode == ConfigMergeMode::Import) {
         // Remove the compiler type from the updated configuration as it has been resolved and applied on the import
         // path. Shouldn't be used further in the stack.
@@ -573,6 +582,7 @@ void PluginPropertyManager::registerProperties() {
 
     registerConfigProperty(BYPASS_UMD_CACHING{}, true);
     registerConfigProperty(CACHE_DIR{}, true);
+    registerConfigProperty(COMPILATION_TARGET{}, true);
     registerConfigProperty(DEFER_WEIGHTS_LOAD{}, true);
     registerConfigProperty(MODEL_PRIORITY{}, true);
     registerConfigProperty(NUM_STREAMS{}, true);

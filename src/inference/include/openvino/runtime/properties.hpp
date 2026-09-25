@@ -1594,4 +1594,16 @@ inline std::istream& operator>>(std::istream& is, CompilationTarget& target) {
  */
 static constexpr Property<std::vector<CompilationTarget>, PropertyMutability::RO> offline_compilation_targets{
     "OFFLINE_COMPILATION_TARGETS"};
+
+/**
+ * @brief Compile-time: select one offline compilation target.
+ * @ingroup ov_runtime_cpp_prop_api
+ *
+ * Passing this to ov::Core::compile_model puts the plugin in offline target-driven mode: the
+ * target's platform is used in place of the current device, and the caller's other compile
+ * properties (e.g. ov::intel_npu::tiles, ov::hint::performance_mode) are forwarded normally. It
+ * must not be combined with an explicit platform selector in the same call - the target already
+ * names one.
+ */
+static constexpr Property<CompilationTarget, PropertyMutability::RW> compilation_target{"COMPILATION_TARGET"};
 }  // namespace ov

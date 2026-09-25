@@ -172,6 +172,21 @@ struct PLATFORM final : OptionBase<PLATFORM, std::string> {
     }
 };
 
+// No defaultValue(): unset until the caller passes ov::compilation_target explicitly.
+struct COMPILATION_TARGET final : OptionBase<COMPILATION_TARGET, ov::CompilationTarget> {
+    static std::string_view key() {
+        return ov::compilation_target.name();
+    }
+
+    static constexpr std::string_view getTypeName() {
+        return "ov::CompilationTarget";
+    }
+
+    static OptionMode mode() {
+        return OptionMode::CompileTime;
+    }
+};
+
 struct DEVICE_ID final : OptionBase<DEVICE_ID, std::string> {
     static std::string_view key() {
         return ov::device::id.name();
