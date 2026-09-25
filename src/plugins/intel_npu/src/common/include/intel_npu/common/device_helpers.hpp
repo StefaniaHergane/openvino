@@ -6,6 +6,8 @@
 
 #include <cstdint>
 #include <map>
+#include <string_view>
+#include <vector>
 
 #include "intel_npu/common/npu.hpp"
 #include "openvino/runtime/intel_npu/properties.hpp"
@@ -16,6 +18,28 @@ namespace utils {
 bool isNPUDevice(const uint32_t deviceId);
 uint32_t getSliceIdBySwDeviceId(const uint32_t swDevId);
 std::string getPlatformByDeviceName(const std::string_view deviceName);
+
+/**
+ * @brief A platform this plugin's compiler can compile for offline, and the PCI device IDs it ships
+ * under.
+ */
+struct KnownPlatform {
+    std::string_view platform;
+    std::vector<uint32_t> deviceIds;
+};
+
+/**
+ * @brief Every platform this plugin's compiler can compile for offline, with the PCI device IDs each
+ * one ships under. Single source of truth for both directions: getPlatformByDeviceId() below maps a
+ * live device to its platform, while the offline_compilation_targets property enumerates the same
+ * table with no device present.
+ */
+const std::vector<KnownPlatform>& getKnownPlatforms();
+
+/**
+ * @brief The standardized platform a PCI device ID belongs to, or an empty view if the ID is unknown.
+ */
+std::string_view getPlatformByDeviceId(uint32_t deviceId);
 std::string getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engineBackend,
                                    const std::string_view platform,
                                    const std::string_view deviceId);

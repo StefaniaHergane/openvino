@@ -4,6 +4,8 @@
 
 #include "intel_npu/common/device_helpers.hpp"
 
+#include <algorithm>
+
 #include "openvino/core/except.hpp"
 
 namespace intel_npu {
@@ -33,6 +35,27 @@ std::string utils::getPlatformByDeviceName(const std::string_view deviceName) {
         (platformPos == std::string::npos) ? deviceName : deviceName.substr(0, platformPos);
 
     return std::string(platformName);
+}
+
+const std::vector<utils::KnownPlatform>& utils::getKnownPlatforms() {
+    // KMD sets usDeviceID from VpuFamilyID.h. NPU3720 ships under two PCI device IDs (P and S parts).
+    static const std::vector<KnownPlatform> knownPlatforms = {
+        {ov::intel_npu::Platform::NPU3720, {0x7D1D, 0xAD1D}},
+        {ov::intel_npu::Platform::NPU4000, {0x643E}},
+        {ov::intel_npu::Platform::NPU5010, {0xB03E}},
+        {ov::intel_npu::Platform::NPU5020, {0xFD3E}},
+        {ov::intel_npu::Platform::NPU6010, {0xD71D}},
+    };
+    return knownPlatforms;
+}
+
+std::string_view utils::getPlatformByDeviceId(uint32_t deviceId) {
+    for (const auto& entry : getKnownPlatforms()) {
+        if (std::find(entry.deviceIds.begin(), entry.deviceIds.end(), deviceId) != entry.deviceIds.end()) {
+            return entry.platform;
+        }
+    }
+    return {};
 }
 
 std::string utils::getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engineBackend,
