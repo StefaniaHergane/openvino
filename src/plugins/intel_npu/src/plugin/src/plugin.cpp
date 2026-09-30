@@ -111,6 +111,7 @@ void register_options(const ov::SoPtr<intel_npu::IEngineBackend>& backend, intel
     REGISTER_OPTION(COMPILER_TYPE);
     REGISTER_OPTION(COMPILER_VERSION);
     REGISTER_OPTION(PLATFORM);
+    REGISTER_OPTION(COMPILATION_TARGET);
     REGISTER_OPTION(CREATE_EXECUTOR);
     REGISTER_OPTION(DYNAMIC_SHAPE_TO_STATIC);
     REGISTER_OPTION(PROFILING_TYPE);
@@ -258,6 +259,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
         }
     }
 
+    // Offline target-driven mode: resolves ov::compilation_target into NPU_PLATFORM before
+    // platform/device resolution runs below (see utils::resolveCompilationTarget for the throw
+    // conditions).
+    utils::resolveCompilationTarget(localProperties);
+
     // DEVICE_ID can be passed both as an index and as a platform name.
     // Identify the right device object to be taken into account when the target compilation platform is determined
     std::string deviceId = _propertiesManager->determineDeviceId(localProperties);
@@ -275,7 +281,8 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     auto compiler = factory.getCompiler(_backend,
                                         compilerType,
                                         compilationPlatform,
-                                        _compilerOptionSupportHelper->getOptionSupportCache());
+                                        _compilerOptionSupportHelper->getOptionSupportCache(),
+                                        localProperties.count(ov::compilation_target.name()) > 0);
 
     localProperties[ov::intel_npu::compiler_type.name()] = compilerType;
     if (!compilationPlatform.empty()) {
@@ -289,6 +296,27 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     auto& unknownProperties = mergedConfigAndUnknownProperties.second;
 
     localConfig.update(ov::intel_npu::compiler_version.name(), compiler->get_version());
+
+    // Only the compiler knows whether the platform ov::compilation_target names resolves to more
+    // than one device variant (e.g. differing tile counts) - ask it, rather than the plugin
+    // guessing. Multi-blob packaging is not implemented yet, so more than one bundle is rejected.
+    if (localConfig.has<COMPILATION_TARGET>()) {
+        const auto bundles = compiler->resolve_compilation_target_bundles(localConfig);
+        OPENVINO_ASSERT(bundles.size() <= 1,
+                        "ov::compilation_target names platform '",
+                        localConfig.get<COMPILATION_TARGET>().platform,
+                        "', which resolves to ",
+                        bundles.size(),
+                        " device variants at compile time; multi-blob compilation for "
+                        "ov::compilation_target is not yet supported");
+        if (!bundles.empty()) {
+            _logger.info("Merging compilation target bundle '%s' into config '%s'",
+                        bundles.front().c_str(),
+                        localConfig.toString().c_str());
+            localConfig.fromString(bundles.front());
+            _logger.info("Config after merging compilation target bundle: '%s'", localConfig.toString().c_str());
+        }
+    }
 
     // Resolve HostCompile before batching so the selected mode controls subsequent model and batch handling.
     if (should_use_host_compile_interpreter(model,
