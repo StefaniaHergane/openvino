@@ -36,6 +36,18 @@ public:
     virtual bool is_option_supported(const std::string& optName,
                                      const std::optional<std::string>& optValue = std::nullopt) const = 0;
 
+    /**
+     * @brief How many blobs the platform named in \p config's NPU_PLATFORM needs compiled from it -
+     * more than one when that platform ships as several SKU variants (e.g. differing tile counts).
+     * @details The default answer is 1, i.e. "a single target" - correct for every adapter that
+     * cannot resolve SKU variants itself. Only the adapter backed by the VCL compiler library
+     * overrides this with a real answer.
+     */
+    virtual size_t get_compilation_target_bundle_count(const Config& config) const {
+        static_cast<void>(config);
+        return 1;
+    }
+
     virtual ~ICompilerAdapter() = default;
 };
 

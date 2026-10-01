@@ -311,4 +311,8 @@ bool PluginCompilerAdapter::is_option_supported(const std::string& optname,
     return supported;
 }
 
+size_t PluginCompilerAdapter::get_compilation_target_bundle_count(const Config& config) const {
+    return _compiler->get_compilation_target_bundle_count(config);
+}
+
 }  // namespace intel_npu

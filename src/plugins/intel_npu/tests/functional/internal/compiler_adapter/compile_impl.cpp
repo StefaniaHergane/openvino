@@ -246,4 +246,18 @@ TEST(ResolveCompilationTargetTests, ThrowsOnConflictingExplicitPlatform) {
     }
 }
 
+// Whether NPU6010's platform resolves to more than one device variant is now a compiler-driven
+// question (see ICompilerAdapter::get_compilation_target_bundle_count and its
+// VCLCompilerImplTest::BundleCount* tests), not something this platform-injection step decides -
+// it treats NPU6010 like any other platform.
+TEST(ResolveCompilationTargetTests, InjectsPlatformForAMultiSkuPlatformToo) {
+    const ov::CompilationTarget target{std::string(ov::intel_npu::Platform::NPU6010), {0xD71D}};
+    ov::AnyMap properties{ov::compilation_target(target)};
+
+    OV_ASSERT_NO_THROW(::intel_npu::utils::resolveCompilationTarget(properties));
+
+    ASSERT_EQ(properties.at(ov::intel_npu::platform.name()).as<std::string>(),
+              std::string(ov::intel_npu::Platform::NPU6010));
+}
+
 }  // namespace

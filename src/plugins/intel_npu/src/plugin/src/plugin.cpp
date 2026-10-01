@@ -296,6 +296,20 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
 
     localConfig.update(ov::intel_npu::compiler_version.name(), compiler->get_version());
 
+    // Only the compiler knows whether the platform ov::compilation_target names resolves to more
+    // than one device variant (e.g. differing tile counts) - ask it, rather than the plugin
+    // guessing. Multi-blob packaging is not implemented yet, so more than one bundle is rejected.
+    if (localConfig.has<COMPILATION_TARGET>()) {
+        const size_t bundleCount = compiler->get_compilation_target_bundle_count(localConfig);
+        OPENVINO_ASSERT(bundleCount == 1,
+                        "ov::compilation_target names platform '",
+                        localConfig.get<COMPILATION_TARGET>().platform,
+                        "', which resolves to ",
+                        bundleCount,
+                        " device variants at compile time; multi-blob compilation for "
+                        "ov::compilation_target is not yet supported");
+    }
+
     // Resolve HostCompile before batching so the selected mode controls subsequent model and batch handling.
     if (should_use_host_compile_interpreter(model,
                                             compilerType,

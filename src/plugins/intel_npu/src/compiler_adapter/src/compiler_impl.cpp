@@ -9,6 +9,7 @@
 #include <cstring>
 #include <limits>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -693,6 +694,61 @@ bool VCLCompilerImpl::is_option_supported(const std::string& option, const std::
     }
 
     return supported;
+}
+
+size_t VCLCompilerImpl::get_compilation_target_bundle_count(const Config& config) const {
+    _logger.debug("get_compilation_target_bundle_count start");
+
+    // Optional/weak entry points: an older VCL library simply does not resolve SKU variants, so the
+    // platform is a single target as far as this compiler is concerned.
+    if (_functions->vclCompilationTargetsCreate == nullptr || _functions->vclGetCompilationTarget == nullptr ||
+        _functions->vclCompilationTargetsDestroy == nullptr) {
+        return 1;
+    }
+
+    // Targets are derived solely from the properties that actually shape SKU/tile resolution -
+    // everything else (LOG_LEVEL, CACHE_DIR, ...) is noise this query does not need and the
+    // compiler's stricter validator here may reject outright (e.g. it does not accept every
+    // LOG_LEVEL spelling toStringForCompiler's usual, more lenient path tolerates).
+    static const std::set<std::string> relevantForResolution = {
+        ov::intel_npu::platform.name(),
+        ov::intel_npu::tiles.name(),
+        ov::intel_npu::max_tiles.name(),
+        ov::hint::performance_mode.name(),
+        ov::intel_npu::compilation_mode.name(),
+    };
+    const auto isRelevantForResolution = [](const std::string& optionName) {
+        return relevantForResolution.count(optionName) > 0;
+    };
+    const std::string resolutionConfig = config.toStringForCompiler(isRelevantForResolution);
+
+    vcl_compilation_targets_handle_t targetsHandle = nullptr;
+    vcl_log_handle_t targetsLogHandle = nullptr;
+    THROW_ON_FAIL_FOR_VCL(
+        *_functions,
+        "vclCompilationTargetsCreate",
+        _functions->vclCompilationTargetsCreate(resolutionConfig.c_str(), resolutionConfig.size(), &targetsHandle,
+                                                &targetsLogHandle),
+        nullptr);
+
+    vcl_compilation_target_t target{};
+    const vcl_result_t getResult = _functions->vclGetCompilationTarget(targetsHandle, &target);
+    // Zeroed out (configBundleCount == 0) means "no target for this config" - unresolved, not
+    // multi-SKU - so fall back to the conservative single-blob answer instead of throwing here; the
+    // compile call right after this one will fail with a proper, specific error if the config really
+    // is invalid.
+    const size_t bundleCount =
+        getResult == VCL_RESULT_SUCCESS && target.configBundleCount > 0 ? static_cast<size_t>(target.configBundleCount)
+                                                                        : 1;
+
+    const vcl_result_t destroyResult = _functions->vclCompilationTargetsDestroy(targetsHandle);
+    if (destroyResult != VCL_RESULT_SUCCESS) {
+        _logger.warning("Failed to destroy VCL compilation targets handle: result 0x%x", destroyResult);
+    }
+
+    THROW_ON_FAIL_FOR_VCL(*_functions, "vclGetCompilationTarget", getResult, targetsLogHandle);
+
+    return bundleCount;
 }
 
 }  // namespace intel_npu

@@ -38,6 +38,8 @@ public:
 
     uint32_t get_version() const override;
 
+    size_t get_compilation_target_bundle_count(const Config& config) const override;
+
 private:
     std::shared_ptr<ZeroInitStructsHolder> _zeroInitStruct;
     std::shared_ptr<ZeGraphExtWrappers> _zeGraphExt;
