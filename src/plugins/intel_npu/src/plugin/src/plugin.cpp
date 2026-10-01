@@ -281,7 +281,8 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     auto compiler = factory.getCompiler(_backend,
                                         compilerType,
                                         compilationPlatform,
-                                        _compilerOptionSupportHelper->getOptionSupportCache());
+                                        _compilerOptionSupportHelper->getOptionSupportCache(),
+                                        localProperties.count(ov::compilation_target.name()) > 0);
 
     localProperties[ov::intel_npu::compiler_type.name()] = compilerType;
     if (!compilationPlatform.empty()) {
