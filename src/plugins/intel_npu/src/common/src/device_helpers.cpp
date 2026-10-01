@@ -59,6 +59,28 @@ std::string_view utils::getPlatformByDeviceId(uint32_t deviceId) {
     return {};
 }
 
+void utils::resolveCompilationTarget(ov::AnyMap& properties) {
+    auto compilationTargetIt = properties.find(ov::compilation_target.name());
+    if (compilationTargetIt == properties.end()) {
+        return;
+    }
+
+    const auto compilationTarget = compilationTargetIt->second.as<ov::CompilationTarget>();
+    auto explicitPlatformIt = properties.find(ov::intel_npu::platform.name());
+    if (explicitPlatformIt != properties.end()) {
+        OPENVINO_ASSERT(explicitPlatformIt->second.as<std::string>() == compilationTarget.platform,
+                        "ov::compilation_target's platform ('",
+                        compilationTarget.platform,
+                        "') conflicts with the explicit ov::intel_npu::platform ('",
+                        explicitPlatformIt->second.as<std::string>(),
+                        "')");
+        return;
+    }
+
+    properties[ov::intel_npu::platform.name()] = compilationTarget.platform;
+}
+
+
 std::string utils::getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engineBackend,
                                           const std::string_view platform,
                                           const std::string_view deviceId) {

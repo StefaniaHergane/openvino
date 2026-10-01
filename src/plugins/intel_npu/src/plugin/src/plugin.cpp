@@ -111,6 +111,7 @@ void register_options(const ov::SoPtr<intel_npu::IEngineBackend>& backend, intel
     REGISTER_OPTION(COMPILER_TYPE);
     REGISTER_OPTION(COMPILER_VERSION);
     REGISTER_OPTION(PLATFORM);
+    REGISTER_OPTION(COMPILATION_TARGET);
     REGISTER_OPTION(CREATE_EXECUTOR);
     REGISTER_OPTION(DYNAMIC_SHAPE_TO_STATIC);
     REGISTER_OPTION(PROFILING_TYPE);
@@ -257,6 +258,11 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
             localProperties.erase(useNpuwKey);
         }
     }
+
+    // Offline target-driven mode: resolves ov::compilation_target into NPU_PLATFORM before
+    // platform/device resolution runs below (see utils::resolveCompilationTarget for the throw
+    // conditions).
+    utils::resolveCompilationTarget(localProperties);
 
     // DEVICE_ID can be passed both as an index and as a platform name.
     // Identify the right device object to be taken into account when the target compilation platform is determined

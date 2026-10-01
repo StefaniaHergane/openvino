@@ -40,6 +40,16 @@ const std::vector<KnownPlatform>& getKnownPlatforms();
  * @brief The standardized platform a PCI device ID belongs to, or an empty view if the ID is unknown.
  */
 std::string_view getPlatformByDeviceId(uint32_t deviceId);
+
+/**
+ * @brief Resolves ov::compilation_target (if present in properties) into ov::intel_npu::platform,
+ * before platform/device resolution runs. ov::compilation_target itself is left in properties and
+ * never reaches the compiler.
+ * @throws ov::Exception if properties also carries an explicit ov::intel_npu::platform naming a
+ * different platform. Whether the target's platform needs more than one blob is a separate,
+ * compiler-driven check - see ICompilerAdapter::get_compilation_target_bundle_count().
+ */
+void resolveCompilationTarget(ov::AnyMap& properties);
 std::string getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engineBackend,
                                    const std::string_view platform,
                                    const std::string_view deviceId);
