@@ -346,26 +346,31 @@ VCL_APIEXPORT vcl_result_t VCL_APICALL vclGetCompilerIsOptionSupported(vcl_compi
                                                                        const char* option, const char* value);
 
 ///////////////////////////////////////////////////////////////////////////////
-/// @brief Describes a single compilation target: a platform, and the config bundles to compile for
-/// it - one blob per bundle. Each bundle is a serialized `KEY="value"` config naming the device only
-/// (e.g. NPU_PLATFORM and NPU_MAX_TILES); nothing else of the config the target was resolved from is
-/// carried over, so each blob is compiled from a bundle concatenated with that config.
+/// @brief Describes a single compilation target: a platform, the PCI device IDs it ships under, and
+/// the config bundles to compile for it - one blob per bundle. Each bundle is a serialized
+/// `KEY="value"` config naming the device only (e.g. NPU_PLATFORM and NPU_MAX_TILES); nothing else of
+/// the config the target was resolved from is carried over, so each blob is compiled from a bundle
+/// concatenated with that config.
 /// @warning All pointers refer to storage owned by the vcl_compilation_targets_handle_t this
 /// target was obtained from and are only valid until that handle is destroyed.
 typedef struct __vcl_compilation_target_t {
     const char* platform;               ///< Standardized platform id, e.g. "4000"
     uint64_t platformSize;              ///< Length of platform, excluding the null terminator
+    const uint32_t* deviceIDs;          ///< PCI device IDs this platform ships under
+    uint64_t deviceIDCount;             ///< Number of entries in deviceIDs
     const char** configBundle;          ///< The config bundles, one blob to compile from each
     const uint64_t* configBundleSizes;  ///< Length of each configBundle entry, excluding the null terminator
     uint64_t configBundleCount;         ///< Number of entries in configBundle and in configBundleSizes
 } vcl_compilation_target_t;
 
 ///////////////////////////////////////////////////////////////////////////////
-/// @brief Resolves the platform a config names into its compilation target and returns the handle.
-/// @details config must name the platform to compile for in NPU_PLATFORM. The target is derived
-/// from config alone - no compiler and no device take part - so the same config resolves to the
-/// same target on any machine. A config the platform cannot compile yields a valid handle without a
-/// target - vclGetCompilationTarget hands out a zeroed-out one - and so does an unknown platform.
+/// @brief Resolves a config into its compilation target(s) and returns the handle.
+/// @details A config naming its platform in NPU_PLATFORM resolves to that platform's target alone; a
+/// config leaving NPU_PLATFORM out resolves every platform this compiler can compile for. The
+/// target(s) are derived from config alone - no compiler and no device take part - so the same
+/// config resolves to the same target(s) on any machine. A platform config cannot compile for - one
+/// that does not support a requested option, or one this compiler does not know - has no target, so
+/// vclGetCompilationTargets may hand out none at all.
 /// @note The handle must be released with vclCompilationTargetsDestroy. Not every VCL library
 /// exports this entry point; callers must treat it as an optional/weak symbol.
 VCL_APIEXPORT vcl_result_t VCL_APICALL vclCompilationTargetsCreate(const char* config, uint64_t configSize,
@@ -373,11 +378,14 @@ VCL_APIEXPORT vcl_result_t VCL_APICALL vclCompilationTargetsCreate(const char* c
                                                                    vcl_log_handle_t* logHandle);
 
 ///////////////////////////////////////////////////////////////////////////////
-/// @brief Retrieves the target resolved by vclCompilationTargetsCreate.
-/// @warning Everything target points to is owned by targetsHandle and only stays valid until
-/// vclCompilationTargetsDestroy is called on it.
-VCL_APIEXPORT vcl_result_t VCL_APICALL vclGetCompilationTarget(vcl_compilation_targets_handle_t targetsHandle,
-                                                               vcl_compilation_target_t* target);
+/// @brief Retrieves the target(s) resolved by vclCompilationTargetsCreate.
+/// @param targets Receives a pointer to the array of resolved targets, or null if there are none.
+/// @param targetCount Receives the number of entries in \b targets.
+/// @warning The array and everything its targets point to are owned by targetsHandle and only stay
+/// valid until vclCompilationTargetsDestroy is called on it.
+VCL_APIEXPORT vcl_result_t VCL_APICALL vclGetCompilationTargets(vcl_compilation_targets_handle_t targetsHandle,
+                                                                const vcl_compilation_target_t** targets,
+                                                                uint64_t* targetCount);
 
 ///////////////////////////////////////////////////////////////////////////////
 /// @brief Destroys the compilation targets handle, releasing the resolved target and its log.

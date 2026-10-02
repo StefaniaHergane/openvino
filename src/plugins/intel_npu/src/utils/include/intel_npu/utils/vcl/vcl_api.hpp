@@ -40,7 +40,7 @@ namespace intel_npu {
 #define vcl_weak_symbols_list()                             \
     vcl_symbol_statement(vclAllocatedExecutableCreate2)     \
     vcl_symbol_statement(vclCompilationTargetsCreate)       \
-    vcl_symbol_statement(vclGetCompilationTarget)           \
+    vcl_symbol_statement(vclGetCompilationTargets)          \
     vcl_symbol_statement(vclCompilationTargetsDestroy)  // clang-format on
 
 /**

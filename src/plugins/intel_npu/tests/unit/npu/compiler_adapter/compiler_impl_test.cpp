@@ -1095,10 +1095,10 @@ TEST_F(VCLCompilerImplTest, BundleCountThrowsWhenCreateFails) {
     EXPECT_THROW(compiler->get_compilation_target_bundle_count(config), ov::Exception);
 }
 
-// A vclGetCompilationTarget failure must also throw, but the handle must still be destroyed first.
+// A vclGetCompilationTargets failure must also throw, but the handle must still be destroyed first.
 TEST_F(VCLCompilerImplTest, BundleCountThrowsWhenGetFailsButStillDestroysTheHandle) {
     fake.enableCompilationTargets();
-    fake.failWith("vclGetCompilationTarget", VCL_RESULT_ERROR_UNKNOWN);
+    fake.failWith("vclGetCompilationTargets", VCL_RESULT_ERROR_UNKNOWN);
     auto compiler = makeCompiler();
     auto config = makePlatformConfig("6010");
 

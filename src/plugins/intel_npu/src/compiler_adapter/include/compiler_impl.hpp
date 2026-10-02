@@ -116,7 +116,7 @@ public:
     /**
      * @brief How many blobs the platform named in \p config's NPU_PLATFORM needs compiled from it -
      * more than one when that platform ships as several SKU variants (e.g. differing tile counts).
-     * @details Calls vclCompilationTargetsCreate/vclGetCompilationTarget/vclCompilationTargetsDestroy,
+     * @details Calls vclCompilationTargetsCreate/vclGetCompilationTargets/vclCompilationTargetsDestroy,
      * which are optional/weak VCL entry points: when the loaded library does not export them, or
      * resolves \p config to no target at all, the conservative answer 1 is returned instead of
      * guessing - the caller then compiles a single blob as it always has.

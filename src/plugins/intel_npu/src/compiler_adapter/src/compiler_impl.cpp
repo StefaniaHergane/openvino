@@ -701,7 +701,7 @@ size_t VCLCompilerImpl::get_compilation_target_bundle_count(const Config& config
 
     // Optional/weak entry points: an older VCL library simply does not resolve SKU variants, so the
     // platform is a single target as far as this compiler is concerned.
-    if (_functions->vclCompilationTargetsCreate == nullptr || _functions->vclGetCompilationTarget == nullptr ||
+    if (_functions->vclCompilationTargetsCreate == nullptr || _functions->vclGetCompilationTargets == nullptr ||
         _functions->vclCompilationTargetsDestroy == nullptr) {
         return 1;
     }
@@ -731,22 +731,25 @@ size_t VCLCompilerImpl::get_compilation_target_bundle_count(const Config& config
                                                 &targetsLogHandle),
         nullptr);
 
-    vcl_compilation_target_t target{};
-    const vcl_result_t getResult = _functions->vclGetCompilationTarget(targetsHandle, &target);
-    // Zeroed out (configBundleCount == 0) means "no target for this config" - unresolved, not
-    // multi-SKU - so fall back to the conservative single-blob answer instead of throwing here; the
-    // compile call right after this one will fail with a proper, specific error if the config really
-    // is invalid.
-    const size_t bundleCount =
-        getResult == VCL_RESULT_SUCCESS && target.configBundleCount > 0 ? static_cast<size_t>(target.configBundleCount)
-                                                                        : 1;
+    // NPU_PLATFORM is always present in resolutionConfig here (resolveCompilationTarget already
+    // injected it), so the query narrows to that one platform - the array holds at most one target.
+    const vcl_compilation_target_t* targets = nullptr;
+    uint64_t targetCount = 0;
+    const vcl_result_t getResult = _functions->vclGetCompilationTargets(targetsHandle, &targets, &targetCount);
+    // No target for this config means "unresolved", not multi-SKU - so fall back to the
+    // conservative single-blob answer instead of throwing here; the compile call right after this
+    // one will fail with a proper, specific error if the config really is invalid.
+    const size_t bundleCount = getResult == VCL_RESULT_SUCCESS && targetCount > 0 && targets != nullptr &&
+                                       targets[0].configBundleCount > 0
+                                   ? static_cast<size_t>(targets[0].configBundleCount)
+                                   : 1;
 
     const vcl_result_t destroyResult = _functions->vclCompilationTargetsDestroy(targetsHandle);
     if (destroyResult != VCL_RESULT_SUCCESS) {
         _logger.warning("Failed to destroy VCL compilation targets handle: result 0x%x", destroyResult);
     }
 
-    THROW_ON_FAIL_FOR_VCL(*_functions, "vclGetCompilationTarget", getResult, targetsLogHandle);
+    THROW_ON_FAIL_FOR_VCL(*_functions, "vclGetCompilationTargets", getResult, targetsLogHandle);
 
     return bundleCount;
 }

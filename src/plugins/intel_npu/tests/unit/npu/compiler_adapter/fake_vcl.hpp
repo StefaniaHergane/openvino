@@ -160,10 +160,10 @@ public:
 
     /// The config string handed to vclCompilationTargetsCreate, per call.
     std::vector<std::string> compilationTargetConfigs;
-    /// Platform vclGetCompilationTarget reports.
+    /// Platform vclGetCompilationTargets reports.
     std::string compilationTargetPlatform = "fake";
-    /// Bundles vclGetCompilationTarget reports, one per SKU variant. Empty means "no target
-    /// resolved" (zeroed-out target, still VCL_RESULT_SUCCESS).
+    /// Bundles vclGetCompilationTargets reports, one per SKU variant. Empty means "no target
+    /// resolved" (targetCount == 0, still VCL_RESULT_SUCCESS).
     std::vector<std::string> compilationTargetBundles{"NPU_PLATFORM=\"fake\""};
 
     /// Wires the (weak) compilation-targets entry points, simulating a VCL library new enough to
@@ -208,13 +208,17 @@ private:
     std::shared_ptr<intel_npu::VCLFunctionTable> _functions;
     std::map<std::string, vcl_result_t> _results;
 
-    // Backing storage for the char*/uint64_t arrays vclGetCompilationTarget hands out - rebuilt from
-    // compilationTargetBundles on every call, and must outlive the pointers handed to the caller.
+    // Backing storage for the char*/uint64_t arrays vclGetCompilationTargets hands out - rebuilt
+    // from compilationTargetBundles on every call, and must outlive the pointers handed to the
+    // caller. _compilationTarget is the single target the array points to (the fake only ever
+    // resolves at most one, matching the production path's always-named-platform queries).
     std::vector<const char*> _compilationTargetBundlePtrs;
     std::vector<uint64_t> _compilationTargetBundleSizes;
+    vcl_compilation_target_t _compilationTarget{};
 
-    friend vcl_result_t VCL_APICALL fake_vclGetCompilationTarget(vcl_compilation_targets_handle_t,
-                                                                 vcl_compilation_target_t*);
+    friend vcl_result_t VCL_APICALL fake_vclGetCompilationTargets(vcl_compilation_targets_handle_t,
+                                                                  const vcl_compilation_target_t**,
+                                                                  uint64_t*);
 };
 
 //
@@ -303,15 +307,17 @@ inline vcl_result_t VCL_APICALL fake_vclCompilationTargetsCreate(const char* con
     return VCL_RESULT_SUCCESS;
 }
 
-inline vcl_result_t VCL_APICALL fake_vclGetCompilationTarget(vcl_compilation_targets_handle_t,
-                                                             vcl_compilation_target_t* target) {
-    FAKE_GUARD(vclGetCompilationTarget)
-    if (target == nullptr) {
+inline vcl_result_t VCL_APICALL fake_vclGetCompilationTargets(vcl_compilation_targets_handle_t,
+                                                              const vcl_compilation_target_t** targets,
+                                                              uint64_t* targetCount) {
+    FAKE_GUARD(vclGetCompilationTargets)
+    if (targets == nullptr || targetCount == nullptr) {
         return VCL_RESULT_ERROR_INVALID_ARGUMENT;
     }
-    *target = vcl_compilation_target_t{};
     if (self->compilationTargetBundles.empty()) {
-        // Zeroed out: "no target resolved for this config", still a success per the real API.
+        // No target resolved for this config, still a success per the real API.
+        *targets = nullptr;
+        *targetCount = 0;
         return VCL_RESULT_SUCCESS;
     }
 
@@ -322,11 +328,14 @@ inline vcl_result_t VCL_APICALL fake_vclGetCompilationTarget(vcl_compilation_tar
         self->_compilationTargetBundleSizes.push_back(bundle.size());
     }
 
-    target->platform = self->compilationTargetPlatform.c_str();
-    target->platformSize = self->compilationTargetPlatform.size();
-    target->configBundle = self->_compilationTargetBundlePtrs.data();
-    target->configBundleSizes = self->_compilationTargetBundleSizes.data();
-    target->configBundleCount = self->_compilationTargetBundlePtrs.size();
+    self->_compilationTarget = vcl_compilation_target_t{};
+    self->_compilationTarget.platform = self->compilationTargetPlatform.c_str();
+    self->_compilationTarget.platformSize = self->compilationTargetPlatform.size();
+    self->_compilationTarget.configBundle = self->_compilationTargetBundlePtrs.data();
+    self->_compilationTarget.configBundleSizes = self->_compilationTargetBundleSizes.data();
+    self->_compilationTarget.configBundleCount = self->_compilationTargetBundlePtrs.size();
+    *targets = &self->_compilationTarget;
+    *targetCount = 1;
     return VCL_RESULT_SUCCESS;
 }
 
@@ -653,13 +662,13 @@ inline void FakeVcl::wire() {
     // Weak symbols the production path does not use stay null, matching an older library.
     _functions->vclAllocatedExecutableCreate2 = nullptr;
     _functions->vclCompilationTargetsCreate = nullptr;
-    _functions->vclGetCompilationTarget = nullptr;
+    _functions->vclGetCompilationTargets = nullptr;
     _functions->vclCompilationTargetsDestroy = nullptr;
 }
 
 inline void FakeVcl::enableCompilationTargets() {
     _functions->vclCompilationTargetsCreate = &fake_vclCompilationTargetsCreate;
-    _functions->vclGetCompilationTarget = &fake_vclGetCompilationTarget;
+    _functions->vclGetCompilationTargets = &fake_vclGetCompilationTargets;
     _functions->vclCompilationTargetsDestroy = &fake_vclCompilationTargetsDestroy;
 }
 
