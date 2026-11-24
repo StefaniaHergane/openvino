@@ -618,6 +618,29 @@ struct STEPPING final : OptionBase<STEPPING, int64_t> {
     }
 };
 
+// No default value: an unset option means "no descriptor given", check it with Config::has<>().
+// RunTime mode keeps it out of the compiler config string: the plugin hands the descriptor to the compiler at
+// creation time rather than as a compilation option.
+struct COMPILATION_DEVICE_DESCRIPTION final
+    : OptionBase<COMPILATION_DEVICE_DESCRIPTION, ov::intel_npu::DeviceDescription> {
+    static std::string_view key() {
+        return ov::intel_npu::compilation_device_description.name();
+    }
+
+    static constexpr std::string_view getTypeName() {
+        return "ov::intel_npu::DeviceDescription";
+    }
+
+    static void validateValue(const ov::intel_npu::DeviceDescription& description) {
+        OPENVINO_ASSERT(description.deviceId != 0,
+                        "A device description with deviceId 0 does not name a device and cannot be compiled for");
+    }
+
+    static OptionMode mode() {
+        return OptionMode::RunTime;
+    }
+};
+
 struct DMA_ENGINES final : OptionBase<DMA_ENGINES, int64_t> {
     static std::string_view key() {
         return ov::intel_npu::dma_engines.name();

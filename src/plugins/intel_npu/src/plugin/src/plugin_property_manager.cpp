@@ -333,6 +333,28 @@ ov::intel_npu::CompilerType PluginPropertyManager::determineCompilerType(const o
     return _config.get<COMPILER_TYPE>();
 }
 
+std::optional<ov::intel_npu::DeviceDescription> PluginPropertyManager::determineCompilationDeviceDescription(
+    const ov::AnyMap& properties) const {
+    const auto it = properties.find(ov::intel_npu::compilation_device_description.name());
+    if (it != properties.end()) {
+        if (it->second.empty()) {
+            return std::nullopt;
+        }
+        // Accept both the struct and its text form, and apply the same validation as the config option
+        auto description = it->second.is<ov::intel_npu::DeviceDescription>()
+                               ? it->second.as<ov::intel_npu::DeviceDescription>()
+                               : COMPILATION_DEVICE_DESCRIPTION::parse(it->second.as<std::string>());
+        COMPILATION_DEVICE_DESCRIPTION::validateValue(description);
+        return description;
+    }
+
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (!_config.has<COMPILATION_DEVICE_DESCRIPTION>()) {
+        return std::nullopt;
+    }
+    return _config.get<COMPILATION_DEVICE_DESCRIPTION>();
+}
+
 std::string PluginPropertyManager::getDeviceIdOrDefault(const ov::AnyMap& arguments) const {
     const auto deviceIdIt = arguments.find(std::string(ov::device::id.name()));
     return deviceIdIt != arguments.end() ? deviceIdIt->second.as<std::string>() : _config.get<DEVICE_ID>();
@@ -740,6 +762,21 @@ void PluginPropertyManager::registerProperties() {
             _config.update(ov::intel_npu::stepping.name(), value.as<std::string>());
         }
     );
+    register_property(ov::intel_npu::compilation_device_description.name(), false, ov::PropertyMutability::RW,
+        [this](const ov::AnyMap&) {
+            return _config.hasOpt(ov::intel_npu::compilation_device_description.name());
+        },
+        [this](const ov::AnyMap&) -> ov::Any {
+            // Not set means no descriptor was given: report an empty value rather than throwing
+            if (!_config.has<COMPILATION_DEVICE_DESCRIPTION>()) {
+                return ov::Any{};
+            }
+            return _config.get<COMPILATION_DEVICE_DESCRIPTION>();
+        },
+        [this](const ov::Any& value) {
+            _config.update(ov::intel_npu::compilation_device_description.name(), value);
+        }
+    );
     register_property(ov::intel_npu::compile_log_level.name(), false, ov::PropertyMutability::RW,
         [this](const ov::AnyMap&) {
             return _config.hasOpt(ov::intel_npu::compile_log_level.name());
@@ -897,6 +934,9 @@ void PluginPropertyManager::registerProperties() {
     register_property(ov::intel_npu::backend_name.name(), false, ov::PropertyMutability::RO, hasBackendPredicate, [this](const ov::AnyMap&) {
         OPENVINO_ASSERT(_backend != nullptr, "No available backend");
         return _backend->getName();
+    }, readOnlySetter);
+    register_property(ov::intel_npu::device_description.name(), false, ov::PropertyMutability::RO, hasBackendAndValidDevice, [this](const ov::AnyMap& arguments) {
+        return utils::getDeviceDescription(_backend, getDeviceIdOrDefault(arguments));
     }, readOnlySetter);
 
     register_property(ov::intel_npu::compiler_version.name(), true, ov::PropertyMutability::RO,

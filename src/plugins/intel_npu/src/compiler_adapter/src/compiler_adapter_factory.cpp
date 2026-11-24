@@ -26,9 +26,25 @@ CompilerAdapterFactory::CompilerAdapterFactory(const ov::SoPtr<IEngineBackend>& 
       _vclFunctionsProvider(vclFunctionsProvider),
       _optionSupportCache(optionSupportCache) {}
 
-std::unique_ptr<ICompilerAdapter> CompilerAdapterFactory::getCompiler(ov::intel_npu::CompilerType& compilerType,
-                                                                      std::string_view platform) const {
+std::unique_ptr<ICompilerAdapter> CompilerAdapterFactory::getCompiler(
+    ov::intel_npu::CompilerType& compilerType,
+    std::string_view platform,
+    const std::optional<ov::intel_npu::DeviceDescription>& deviceDescription) const {
     const auto device = _engineBackend ? _engineBackend->getDevice() : nullptr;
+
+    if (deviceDescription.has_value()) {
+        // Compiling for a device description is offline compilation: only the compiler-in-plugin takes a device
+        // descriptor, so PREFER_PLUGIN must not fall back to the driver compiler even when a device is present.
+        if (compilerType == ov::intel_npu::CompilerType::PREFER_PLUGIN) {
+            compilerType = ov::intel_npu::CompilerType::PLUGIN;
+        }
+        OPENVINO_ASSERT(compilerType == ov::intel_npu::CompilerType::PLUGIN,
+                        ov::intel_npu::compilation_device_description.name(),
+                        " requires the compiler-in-plugin, but ",
+                        ov::intel_npu::compiler_type.name(),
+                        " is set to ",
+                        compilerType);
+    }
 
     if (compilerType == ov::intel_npu::CompilerType::PREFER_PLUGIN) {
         compilerType = resolvePreferPluginCompiler(device, platform);
@@ -41,11 +57,21 @@ std::unique_ptr<ICompilerAdapter> CompilerAdapterFactory::getCompiler(ov::intel_
             OPENVINO_ASSERT(_vclFunctionsProvider != nullptr,
                             "CompilerAdapterFactory requires a way to obtain the VCL entry points");
             functions = _vclFunctionsProvider();
-            const bool onlineCompilation = device && (platform.empty() || device->getName() == platform);
+
+            // The device descriptor handed to the compiler: the requested device description, else the backend
+            // device for online compilation, else none (offline compilation for a platform only)
+            std::optional<IDevice::DeviceProperties> compilerDeviceProperties;
+            if (deviceDescription.has_value()) {
+                compilerDeviceProperties = IDevice::DeviceProperties{deviceDescription->deviceId,
+                                                                     deviceDescription->subdeviceId,
+                                                                     deviceDescription->numSlices};
+            } else if (device && (platform.empty() || device->getName() == platform)) {
+                compilerDeviceProperties = device->getDeviceProperties();
+            }
+
             compiler = std::make_shared<VCLCompilerImpl>(
                 functions,
-                onlineCompilation ? std::optional<IDevice::DeviceProperties>{device->getDeviceProperties()}
-                                  : std::nullopt,
+                compilerDeviceProperties,
                 ScopedOptionSupportCache{
                     _optionSupportCache,
                     static_cast<OptionSupportCache::CacheKey>(ov::intel_npu::CompilerType::PLUGIN)});

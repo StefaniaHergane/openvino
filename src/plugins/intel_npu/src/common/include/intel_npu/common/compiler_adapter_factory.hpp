@@ -5,12 +5,14 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
 #include "intel_npu/common/icompiler_adapter.hpp"
 #include "intel_npu/common/npu.hpp"
 #include "intel_npu/common/option_support_cache.hpp"
+#include "intel_npu/npu_private_properties.hpp"
 #include "intel_npu/utils/vcl/vcl_function_table_provider.hpp"
 #include "openvino/runtime/intel_npu/properties.hpp"
 
@@ -55,12 +57,17 @@ public:
      *        (never PREFER_PLUGIN).
      * @param platform The compilation target platform. Empty means no explicit target, which is treated as online
      *        compilation on the backend device.
+     * @param deviceDescription The device to compile for, from NPU_COMPILATION_DEVICE_DESCRIPTION. When given, it is
+     *        what the compiler receives as its device descriptor, instead of the backend device, and only the
+     *        compiler-in-plugin can serve it: PREFER_PLUGIN resolves to PLUGIN without the online fallback to DRIVER.
      * @return The compiler adapter. Never null.
      * @throws ov::Exception if the requested compiler cannot be created, if the driver compiler is selected without a
-     *         device matching `platform`, or if `compilerType` is invalid.
+     *         device matching `platform` or together with a `deviceDescription`, or if `compilerType` is invalid.
      */
-    std::unique_ptr<ICompilerAdapter> getCompiler(ov::intel_npu::CompilerType& compilerType,
-                                                  std::string_view platform) const;
+    std::unique_ptr<ICompilerAdapter> getCompiler(
+        ov::intel_npu::CompilerType& compilerType,
+        std::string_view platform,
+        const std::optional<ov::intel_npu::DeviceDescription>& deviceDescription = std::nullopt) const;
 
     /** @brief Returns the shared compiler option cache, or null if caching is disabled. */
     std::shared_ptr<OptionSupportCache> getOptionSupportCache() const {

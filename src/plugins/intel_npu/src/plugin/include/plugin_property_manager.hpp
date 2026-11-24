@@ -45,6 +45,12 @@ public:
     std::string determinePlatform(const ov::AnyMap& properties) const;
     std::string determineDeviceId(const ov::AnyMap& properties) const;
     ov::intel_npu::CompilerType determineCompilerType(const ov::AnyMap& properties) const;
+    /**
+     * @brief The NPU_COMPILATION_DEVICE_DESCRIPTION to compile for, from the properties or else from the stored config.
+     * @return std::nullopt when no descriptor is given (an empty value in the properties also counts as not given).
+     */
+    std::optional<ov::intel_npu::DeviceDescription> determineCompilationDeviceDescription(
+        const ov::AnyMap& properties) const;
 
 private:
     void registerProperties();

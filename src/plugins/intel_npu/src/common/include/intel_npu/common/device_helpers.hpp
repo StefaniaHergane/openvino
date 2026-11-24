@@ -16,9 +16,28 @@ namespace utils {
 bool isNPUDevice(const uint32_t deviceId);
 uint32_t getSliceIdBySwDeviceId(const uint32_t swDevId);
 std::string getPlatformByDeviceName(const std::string_view deviceName);
+
+/**
+ * @brief Maps a PCI device ID to the NPU platform name; needs no device to be present.
+ * @return The platform name, or ov::intel_npu::Platform::AUTO_DETECT for a device ID that is not known.
+ * @throws for the device IDs of legacy NPUs, which are not supported.
+ */
+std::string getPlatformByDeviceId(const uint32_t deviceId);
 std::string getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engineBackend,
                                    const std::string_view platform,
                                    const std::string_view deviceId);
+
+/**
+ * @brief Gets the compilation platform for a device description, checked against the requested NPU_PLATFORM.
+ * @param description The device to compile for.
+ * @param platform The requested NPU_PLATFORM; ov::intel_npu::Platform::AUTO_DETECT when not requested.
+ * @return The platform of the description's device ID. ov::intel_npu::Platform::AUTO_DETECT when the plugin does not
+ * know the device ID, leaving the compiler to resolve it.
+ * @throws if the requested platform differs from the description's, or if a platform is requested together with a
+ * device ID the plugin does not know, since the two cannot be checked against each other.
+ */
+std::string getCompilationPlatform(const ov::intel_npu::DeviceDescription& description,
+                                   const std::string_view platform);
 
 /**
  * @brief Gets the device by its ID.
@@ -31,6 +50,14 @@ IDevice::Uuid getDeviceUuid(const ov::SoPtr<IEngineBackend>& engineBackend, cons
 ov::device::LUID getDeviceLUID(const ov::SoPtr<IEngineBackend>& engineBackend, const std::string& specifiedDeviceName);
 uint32_t getSteppingNumber(const ov::SoPtr<IEngineBackend>& engineBackend, const std::string& specifiedDeviceName);
 uint32_t getMaxTiles(const ov::SoPtr<IEngineBackend>& engineBackend, const std::string& specifiedDeviceName);
+
+/**
+ * @brief Gets the device descriptor of the specified device.
+ * @throws if no device with the given name is available.
+ */
+ov::intel_npu::DeviceDescription getDeviceDescription(const ov::SoPtr<IEngineBackend>& engineBackend,
+                                                      const std::string& specifiedDeviceName);
+
 uint64_t getDeviceAllocMemSize(const ov::SoPtr<IEngineBackend>& engineBackend, const std::string& specifiedDeviceName);
 uint64_t getDeviceTotalMemSize(const ov::SoPtr<IEngineBackend>& engineBackend, const std::string& specifiedDeviceName);
 std::string getDeviceName(const ov::SoPtr<IEngineBackend>& engineBackend, const std::string& specifiedDeviceName);

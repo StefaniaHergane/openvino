@@ -4,6 +4,16 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <istream>
+#include <limits>
+#include <optional>
+#include <ostream>
+#include <sstream>
+#include <string>
+
 #include "openvino/runtime/intel_npu/properties.hpp"
 
 namespace ov {
@@ -444,6 +454,144 @@ static constexpr ov::Property<int64_t> create_executor{"NPU_CREATE_EXECUTOR"};
  * @brief Read-only property to get the name of used backend
  */
 static constexpr ov::Property<std::string, ov::PropertyMutability::RO> backend_name{"NPU_BACKEND_NAME"};
+
+/**
+ * @brief Device descriptor of an NPU device: the device information the plugin hands to the compiler for online
+ * compilation.
+ */
+struct DeviceDescription {
+    uint32_t deviceId;     //!< PCI device ID; "device" in the text form
+    uint32_t subdeviceId;  //!< Device revision; "stepping" in the text form
+    uint32_t numSlices;    //!< Maximum number of slices; "tiles" in the text form
+};
+
+inline bool operator==(const DeviceDescription& lhs, const DeviceDescription& rhs) {
+    return lhs.deviceId == rhs.deviceId && lhs.subdeviceId == rhs.subdeviceId && lhs.numSlices == rhs.numSlices;
+}
+
+inline bool operator!=(const DeviceDescription& lhs, const DeviceDescription& rhs) {
+    return !(lhs == rhs);
+}
+
+namespace detail {
+
+/**
+ * @brief Parses one DeviceDescription value: "0x"-prefixed hexadecimal for "device", decimal otherwise.
+ * Only plain digits are accepted (no sign, no whitespace), and the value must fit in 32 bits.
+ */
+inline uint32_t parseDeviceDescriptionValue(const std::string& key, const std::string& value) {
+    const bool isHex = key == "device";
+    std::string digits = value;
+    if (isHex) {
+        if (value.size() < 2 || value[0] != '0' || (value[1] != 'x' && value[1] != 'X')) {
+            OPENVINO_THROW("Could not deserialize DeviceDescription: '", key, "' must be a 0x-prefixed hex value, got '",
+                           value, "'");
+        }
+        digits = value.substr(2);
+    }
+
+    const auto isValidDigit = [isHex](char c) {
+        const auto uc = static_cast<unsigned char>(c);
+        return isHex ? std::isxdigit(uc) != 0 : std::isdigit(uc) != 0;
+    };
+    // At most 8 hex or 10 decimal digits: anything longer cannot be a 32-bit value, and std::stoull stays in range
+    const size_t maxDigits = isHex ? 8 : 10;
+    if (digits.empty() || digits.size() > maxDigits || !std::all_of(digits.begin(), digits.end(), isValidDigit)) {
+        OPENVINO_THROW("Could not deserialize DeviceDescription: invalid value '", value, "' for '", key, "'");
+    }
+
+    const auto parsed = std::stoull(digits, nullptr, isHex ? 16 : 10);
+    if (parsed > std::numeric_limits<uint32_t>::max()) {
+        OPENVINO_THROW("Could not deserialize DeviceDescription: value '", value, "' for '", key, "' is out of range");
+    }
+    return static_cast<uint32_t>(parsed);
+}
+
+}  // namespace detail
+
+/**
+ * @brief Serializes a DeviceDescription as "device=0x<hex>,stepping=<dec>,tiles=<dec>".
+ * The output does not depend on the formatting state of the stream.
+ */
+inline std::ostream& operator<<(std::ostream& os, const DeviceDescription& description) {
+    std::ostringstream text;
+    text << "device=0x" << std::hex << description.deviceId << std::dec << ",stepping=" << description.subdeviceId
+         << ",tiles=" << description.numSlices;
+    return os << text.str();
+}
+
+/**
+ * @brief Deserializes a DeviceDescription from the format written by operator<<.
+ * Reads one whitespace-delimited token of comma-separated key=value pairs, in any order. Each of "device", "stepping"
+ * and "tiles" must appear exactly once; unknown keys, missing keys and malformed values are errors.
+ */
+inline std::istream& operator>>(std::istream& is, DeviceDescription& description) {
+    std::string text;
+    if (!(is >> text)) {
+        OPENVINO_THROW("Could not deserialize DeviceDescription: empty input");
+    }
+
+    std::optional<uint32_t> device;
+    std::optional<uint32_t> stepping;
+    std::optional<uint32_t> tiles;
+
+    size_t fieldBegin = 0;
+    while (true) {
+        const size_t fieldEnd = text.find(',', fieldBegin);
+        const std::string field =
+            text.substr(fieldBegin, fieldEnd == std::string::npos ? std::string::npos : fieldEnd - fieldBegin);
+
+        const size_t separator = field.find('=');
+        if (separator == std::string::npos) {
+            OPENVINO_THROW("Could not deserialize DeviceDescription: expected key=value, got '", field, "'");
+        }
+        const std::string key = field.substr(0, separator);
+        const std::string value = field.substr(separator + 1);
+
+        std::optional<uint32_t>* slot = key == "device"     ? &device
+                                        : key == "stepping" ? &stepping
+                                        : key == "tiles"    ? &tiles
+                                                            : nullptr;
+        if (slot == nullptr) {
+            OPENVINO_THROW("Could not deserialize DeviceDescription: unknown key '", key, "'");
+        }
+        if (slot->has_value()) {
+            OPENVINO_THROW("Could not deserialize DeviceDescription: duplicate key '", key, "'");
+        }
+        *slot = detail::parseDeviceDescriptionValue(key, value);
+
+        if (fieldEnd == std::string::npos) {
+            break;
+        }
+        fieldBegin = fieldEnd + 1;
+    }
+
+    if (!device.has_value() || !stepping.has_value() || !tiles.has_value()) {
+        OPENVINO_THROW("Could not deserialize DeviceDescription: '",
+                       !device.has_value() ? "device" : (!stepping.has_value() ? "stepping" : "tiles"),
+                       "' is missing");
+    }
+
+    description = DeviceDescription{*device, *stepping, *tiles};
+    return is;
+}
+
+/**
+ * @brief [Only for NPU Plugin]
+ * Type: DeviceDescription, read-only.
+ * Device descriptor of the selected device, see DeviceDescription. Available only when a device is present.
+ */
+static constexpr ov::Property<DeviceDescription, ov::PropertyMutability::RO> device_description{
+    "NPU_DEVICE_DESCRIPTION"};
+
+/**
+ * @brief [Only for NPU Plugin]
+ * Type: DeviceDescription, not set by default.
+ * The device to compile for, as a descriptor read earlier through NPU_DEVICE_DESCRIPTION, so that a model can be
+ * compiled for that device with no driver or hardware present. Accepts the DeviceDescription itself or its text form.
+ * A descriptor with deviceId 0 is rejected, since the compiler treats it as "no device".
+ */
+static constexpr ov::Property<DeviceDescription> compilation_device_description{"NPU_COMPILATION_DEVICE_DESCRIPTION"};
 
 /**
  * @brief [Only for NPU compiler]

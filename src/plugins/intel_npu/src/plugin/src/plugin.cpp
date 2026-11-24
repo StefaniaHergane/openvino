@@ -6,6 +6,7 @@
 
 #include <fstream>
 #include <numeric>
+#include <sstream>
 
 #include "blob_format_importers.hpp"
 #include "compiled_model.hpp"
@@ -126,6 +127,7 @@ void register_options(const ov::SoPtr<intel_npu::IEngineBackend>& backend, intel
     REGISTER_OPTION(QDQ_OPTIMIZATION);
     REGISTER_OPTION(QDQ_OPTIMIZATION_AGGRESSIVE);
     REGISTER_OPTION(STEPPING);
+    REGISTER_OPTION(COMPILATION_DEVICE_DESCRIPTION);
     REGISTER_OPTION(DISABLE_VERSION_CHECK);
     REGISTER_OPTION(EXPORT_RAW_BLOB);
     REGISTER_OPTION(IMPORT_RAW_BLOB);
@@ -291,18 +293,37 @@ std::shared_ptr<ov::ICompiledModel> Plugin::compile_model(const std::shared_ptr<
     std::string deviceId = _propertiesManager->determineDeviceId(localProperties);
     std::shared_ptr<IDevice> device = utils::getDeviceById(_backend, deviceId);
 
-    // Determine the final compilation target based on NPU_PLATFORM, determined device name (if any) and the list of
+    // Determine the final compilation target. A device description, when given, decides it (checked against
+    // NPU_PLATFORM). Otherwise it is based on NPU_PLATFORM, the determined device name (if any) and the list of
     // available devices (if any)
+    const auto compilationDeviceDescription =
+        _propertiesManager->determineCompilationDeviceDescription(localProperties);
     const auto compilationPlatform =
-        utils::getCompilationPlatform(_backend,
-                                      _propertiesManager->determinePlatform(localProperties),
-                                      device == nullptr ? std::move(deviceId) : device->getName());
+        compilationDeviceDescription.has_value()
+            ? utils::getCompilationPlatform(compilationDeviceDescription.value(),
+                                            _propertiesManager->determinePlatform(localProperties))
+            : utils::getCompilationPlatform(_backend,
+                                            _propertiesManager->determinePlatform(localProperties),
+                                            device == nullptr ? std::move(deviceId) : device->getName());
+    if (compilationDeviceDescription.has_value()) {
+        std::ostringstream description;
+        description << compilationDeviceDescription.value();
+        _logger.info("Compiling for the device description '%s', platform '%s'",
+                     description.str().c_str(),
+                     compilationPlatform.c_str());
+    }
 
     ov::intel_npu::CompilerType compilerType = _propertiesManager->determineCompilerType(localProperties);
-    auto compiler = _compilerAdapterFactory->getCompiler(compilerType, compilationPlatform);
+    auto compiler =
+        _compilerAdapterFactory->getCompiler(compilerType, compilationPlatform, compilationDeviceDescription);
 
     localProperties[ov::intel_npu::compiler_type.name()] = compilerType;
-    if (!compilationPlatform.empty()) {
+    // A device description with a device ID the plugin does not know resolves to AUTO_DETECT. Leave NPU_PLATFORM unset
+    // then, so that the compiler derives the platform from the device descriptor instead of being handed a value
+    // that would take precedence over it.
+    const bool platformLeftToCompiler = compilationDeviceDescription.has_value() &&
+                                        compilationPlatform == ov::intel_npu::Platform::AUTO_DETECT;
+    if (!compilationPlatform.empty() && !platformLeftToCompiler) {
         localProperties[ov::intel_npu::platform.name()] = compilationPlatform;
     }
 

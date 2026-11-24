@@ -35,6 +35,37 @@ std::string utils::getPlatformByDeviceName(const std::string_view deviceName) {
     return std::string(platformName);
 }
 
+std::string utils::getPlatformByDeviceId(const uint32_t deviceId) {
+    // Blacklisted device IDs
+    constexpr uint32_t LEGACY_NPU_3000_DEVICE_ID = 0x6240;
+
+    // KMD is setting usDeviceID from VpuFamilyID.h
+    constexpr uint32_t NPU_3720_P_DEVICE_ID = 0x7D1D;
+    constexpr uint32_t NPU_3720_S_DEVICE_ID = 0xAD1D;
+    constexpr uint32_t NPU_4000_DEVICE_ID = 0x643E;
+    constexpr uint32_t NPU_5010_DEVICE_ID = 0xB03E;
+    constexpr uint32_t NPU_5020_DEVICE_ID = 0xFD3E;
+    constexpr uint32_t NPU_6010_DEVICE_ID = 0xD71D;
+
+    switch (deviceId) {
+    case NPU_3720_P_DEVICE_ID:
+    case NPU_3720_S_DEVICE_ID:
+        return std::string(ov::intel_npu::Platform::NPU3720);
+    case NPU_4000_DEVICE_ID:
+        return std::string(ov::intel_npu::Platform::NPU4000);
+    case NPU_5010_DEVICE_ID:
+        return std::string(ov::intel_npu::Platform::NPU5010);
+    case NPU_5020_DEVICE_ID:
+        return std::string(ov::intel_npu::Platform::NPU5020);
+    case NPU_6010_DEVICE_ID:
+        return std::string(ov::intel_npu::Platform::NPU6010);
+    case LEGACY_NPU_3000_DEVICE_ID:
+        OPENVINO_THROW("[LEGACY] NPU device ID 0x", std::hex, deviceId, " is not supported!");
+    default:
+        return std::string(ov::intel_npu::Platform::AUTO_DETECT);
+    }
+}
+
 std::string utils::getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engineBackend,
                                           const std::string_view platform,
                                           const std::string_view deviceId) {
@@ -59,6 +90,45 @@ std::string utils::getCompilationPlatform(const ov::SoPtr<IEngineBackend>& engin
     }
 
     return ov::intel_npu::Platform::standardize(utils::getPlatformByDeviceName(availableDevicesNames.at(0)));
+}
+
+std::string utils::getCompilationPlatform(const ov::intel_npu::DeviceDescription& description,
+                                          const std::string_view platform) {
+    const auto descriptionPlatform = getPlatformByDeviceId(description.deviceId);
+    const bool platformRequested = platform != ov::intel_npu::Platform::AUTO_DETECT;
+
+    if (descriptionPlatform == ov::intel_npu::Platform::AUTO_DETECT) {
+        // An unknown device ID may still be known to the compiler, which derives the platform from it on its own.
+        // A requested platform cannot be checked against it though, and the compiler would silently prefer the
+        // requested platform over the device description.
+        OPENVINO_ASSERT(!platformRequested,
+                        ov::intel_npu::platform.name(),
+                        " '",
+                        platform,
+                        "' cannot be checked against the unknown device ID 0x",
+                        std::hex,
+                        description.deviceId,
+                        " of ",
+                        ov::intel_npu::compilation_device_description.name(),
+                        ". Leave ",
+                        ov::intel_npu::platform.name(),
+                        " unset to let the compiler resolve the platform.");
+        return descriptionPlatform;
+    }
+
+    if (platformRequested) {
+        const auto requestedPlatform = ov::intel_npu::Platform::standardize(platform);
+        OPENVINO_ASSERT(requestedPlatform == descriptionPlatform,
+                        ov::intel_npu::platform.name(),
+                        " '",
+                        requestedPlatform,
+                        "' conflicts with the platform '",
+                        descriptionPlatform,
+                        "' of ",
+                        ov::intel_npu::compilation_device_description.name());
+    }
+
+    return descriptionPlatform;
 }
 
 std::shared_ptr<IDevice> utils::getDeviceById(const ov::SoPtr<IEngineBackend>& engineBackend,
@@ -138,6 +208,20 @@ uint32_t utils::getMaxTiles(const ov::SoPtr<IEngineBackend>& engineBackend, cons
     auto device = getDeviceById(engineBackend, devName);
     if (device) {
         return device->getMaxNumSlices();
+    }
+
+    OPENVINO_THROW("No device with name '", specifiedDeviceName, "' is available");
+}
+
+ov::intel_npu::DeviceDescription utils::getDeviceDescription(const ov::SoPtr<IEngineBackend>& engineBackend,
+                                                             const std::string& specifiedDeviceName) {
+    const auto devName = getDeviceName(engineBackend, specifiedDeviceName);
+    auto device = getDeviceById(engineBackend, devName);
+    if (device) {
+        const auto deviceProperties = device->getDeviceProperties();
+        return ov::intel_npu::DeviceDescription{deviceProperties.deviceId,
+                                                deviceProperties.subdeviceId,
+                                                deviceProperties.numSlices};
     }
 
     OPENVINO_THROW("No device with name '", specifiedDeviceName, "' is available");
